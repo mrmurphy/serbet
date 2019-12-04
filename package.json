@@ -6,6 +6,7 @@
     "build": "bsb -make-world",
     "start": "bsb -make-world -w"
   },
+  "repository": "https://github.com/mrmurphy/serbet",
   "keywords": [
     "BuckleScript",
     "Reason",

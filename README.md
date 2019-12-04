@@ -4,7 +4,7 @@ A simple way to set up an Express.js server on top of Node.js using ReasonML.
 
 Documentation planned! For now, you can read the source code or take a look at this:
 
-```reasonml
+```reason
 open Async;
 
 module App =
@@ -30,7 +30,7 @@ Here are some quick tips:
 - `decco` and `bs-let` are peer dependencies. Don't forget to install them or things won't work!
 - There are helper functions for parsing path elements, queries, and bodies, like this:
 
-```reasonml
+```reason
 module Hello =
   App.Handle({
     open App;
@@ -53,7 +53,7 @@ module Hello =
 - You can abort the request at any time with the `abort` function, which takes a `response` type. (This uses JS promise exceptions)
 - If you have a greenfield server and want to just use Json everywhere, you can make your life a little easier with `HandleJson`:
 
-```reasonml
+```reason
 module Hello =
   App.Handle({
     open App;

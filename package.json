@@ -1,0 +1,28 @@
+{
+  "name": "re-serve",
+  "version": "0.1.0",
+  "scripts": {
+    "clean": "bsb -clean-world",
+    "build": "bsb -make-world",
+    "start": "bsb -make-world -w"
+  },
+  "keywords": [
+    "BuckleScript",
+    "Reason",
+    "Express",
+    "HTTP"
+  ],
+  "author": "Murphy Randle",
+  "license": "MIT",
+  "peerDependencies": {
+    "bs-platform": "^6.x.x",
+    "decco": "^1.0.0",
+    "bs-let": "^0.1.11"
+  },
+  "dependencies": {
+    "bluebird": "^3.7.2",
+    "body-parser": "^1.19.0",
+    "bs-express": "^1.0.0"
+  },
+  "devDependencies": {}
+}

@@ -1,5 +1,5 @@
 {
-  "name": "re-serve",
+  "name": "serbet",
   "version": "0.1.1",
   "scripts": {
     "clean": "bsb -clean-world",

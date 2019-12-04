@@ -1,5 +1,5 @@
 {
-  "name": "re-serve",
+  "name": "serbet",
   "sources": {
     "dir": "src",
     "subdirs": true

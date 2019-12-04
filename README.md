@@ -1,4 +1,4 @@
-## Re-Serve
+## Serbet (like sorbet, but a server. Get it? 🍨)
 
 A simple way to set up an Express.js server on top of Node.js using ReasonML.
 

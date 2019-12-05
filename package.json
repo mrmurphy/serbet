@@ -1,6 +1,6 @@
 {
   "name": "serbet",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "scripts": {
     "clean": "bsb -clean-world",
     "build": "bsb -make-world",

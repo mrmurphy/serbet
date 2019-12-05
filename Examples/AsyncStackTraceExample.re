@@ -1,4 +1,6 @@
-// If you copy this file into your project, run the compiled JS artifact, aand then open localhost:3002 in your browser, you'll see a detailed stack trace that leads you back through the actual execution path of the code, thanks to Bluebird's async stack traces.
+// Node.js by default doesn't have useful stack traces when it comes to async code. But asnc stack traces are essential for debugging when writing a real server. This library uses Bluebird to replace the global promise implementation which gives async stack traces by default in development.
+// Copy this file into your project (it's not meant to be runnable from within this project), run the compiled JS artifact, and then open localhost:3002 in your browser, you'll see a detailed stack trace that leads you back through the actual execution path of the code, thanks to Bluebird's async stack traces.
+
 open Async;
 
 type user = {

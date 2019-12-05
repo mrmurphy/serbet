@@ -20,11 +20,14 @@ let newUser = () => {
   async @@ {id: 1, email: ""};
 };
 
-open Handler;
-module Endpoint =
-  Handler.Make({
-    let path = "/";
+module App =
+  Serbet.App({});
+
+module Hello =
+  App.Handle({
+    open App;
     let verb = GET;
+    let path = "/";
     let handler = _req => {
       let%Async user = newUser();
       let%Async user2 = processUser(user);
@@ -33,9 +36,4 @@ module Endpoint =
     };
   });
 
-let app = Express.App.make();
-let router = Express.Router.make();
-router->Endpoint.use;
-
-app->Express.App.useRouter(router);
-app->Express.App.listen(~port=3002, ());
+App.start(~port=3110, ());

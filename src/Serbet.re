@@ -1,19 +1,17 @@
-module HandlerSrc = Handler;
-
-module Make = (()) => {
+module App = (()) => {
   let app = Express.App.make();
   let router = Express.Router.make();
   app->Express.App.useRouter(router);
 
-  include Handler;
+  include Serbet_Handler;
 
   module Handle =
-    HandlerSrc.Make({
+    Serbet_Handler.Make({
       let app = app;
     });
 
   module HandleJson =
-    HandlerSrc.MakeJson({
+    Serbet_Handler.MakeJson({
       let app = app;
     });
 

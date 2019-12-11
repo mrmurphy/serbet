@@ -15,6 +15,7 @@ type res =
   | StatusString(Status.t, string)
   | StatusJson(Status.t, Js.Json.t)
   | TemporaryRedirect(string)
+  | InternalServerError
   | RespondRaw(Express.Response.t => Express.complete)
   | RespondRawAsync(Express.Response.t => promise(Express.complete));
 
@@ -64,14 +65,12 @@ let requireBody: Decco.decoder('body) => guard('body) =
     | Some(rawBodyJson) =>
       switch (decoder(rawBodyJson)) {
       | Error(e) =>
-        raise(
-          HttpException(
-            BadRequest(
-              "Could not decode expected body: location="
-              ++ e.path
-              ++ ", message="
-              ++ e.message,
-            ),
+        abort(
+          BadRequest(
+            "Could not decode expected body: location="
+            ++ e.path
+            ++ ", message="
+            ++ e.message,
           ),
         )
       | Ok(v) => v->async
@@ -173,6 +172,11 @@ module MakeWithCustomMiddleware =
         |> setHeader("content-type", "text/plain; charset=utf-8")
         |> sendString(msg)
       )
+    | InternalServerError =>
+      async @@
+      Express.Response.(
+        res |> sendStatus(Express.Response.StatusCode.InternalServerError)
+      )
     | StatusJson(stat, js) =>
       async @@ Express.Response.(res |> status(stat) |> sendJson(js))
     | TemporaryRedirect(location) =>
@@ -191,27 +195,27 @@ module MakeWithCustomMiddleware =
       [@bs.open]
       (
         fun
-        | HttpException(handlerResponse) =>
-          resToExpressRes(res, handlerResponse)
+        | HttpException(handlerResponse) => handlerResponse
       );
     let handleError = error => {
       switch (handleOCamlError(error)) {
-      | Some(complete) => complete
+      | Some(res) => res->async
       | None =>
         switch (Obj.magic(error)##stack) {
         | Some(stack) => Js.log2("Unhandled internal server error", stack)
         | None => Js.log2("Unhandled internal server error", error)
         };
-        Express.Response.(res |> sendStatus(Status.InternalServerError))
-        ->async;
+        InternalServerError->async;
       };
     };
 
     switch (Cfg.handler(req)) {
-    | exception err => handleError(err)
+    | exception err =>
+      let%Async r = handleError(err);
+      resToExpressRes(res, r);
     | p =>
-      let%Async r = p;
-      resToExpressRes(res, r)->catch(handleError);
+      let%Async r = p->catch(handleError);
+      resToExpressRes(res, r);
     };
   };
   let expressHandler = Express.PromiseMiddleware.from(wrappedHandler);
@@ -273,7 +277,7 @@ module MakeJson = (AppCfg: AppCfg, Cfg: HandlerConfigWithBody) => {
               let handler = req => {
                 let%Async body = requireBody(Cfg.body_decode, req);
                 let%Async response = Cfg.handler(body, req);
-                async(OkJson(Cfg.response_encode(response)))
+                async(OkJson(Cfg.response_encode(response)));
               };
             },
           );

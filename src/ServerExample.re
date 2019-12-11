@@ -3,10 +3,11 @@ open Async;
 module App =
   Serbet.App({});
 
+open App;
+
 // This makes and registers an endpoint, all in one go.
 module Hello =
   App.Handle({
-    open App;
     let verb = GET;
     let path = "/";
     let handler = _req => {
@@ -18,7 +19,6 @@ module Hello =
 // This is a convenience module which automatically parses and json body and encodes a json response.
 module HelloJson =
   App.HandleJson({
-    open App;
     let verb = POST;
     let path = "/json";
 
@@ -32,6 +32,21 @@ module HelloJson =
     // Now the parsed body gets passed in as the first argument to the handler.
     let handler = (body, _req) => {
       async @@ {greeting: "Hello " ++ body.name};
+    };
+  });
+
+module HelloQuery =
+  App.Handle({
+    let verb = GET;
+    let path = "hello/query";
+
+    [@decco.decode]
+    type query = {name: string};
+
+    let handler = req => {
+      let%Async query = requireQuery(query_decode, req);
+
+      OkString("Hello there, " ++ query.name)->async;
     };
   });
 

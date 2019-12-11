@@ -4,6 +4,12 @@
 // stack traces to be generated for debugging runtime issues.
 %bs.raw
 {|global.Promise = require('bluebird')|};
+%bs.raw
+{|
+Promise.config({
+  warnings: false
+})
+|};
 
 let let_ = (p, cb) => Js.Promise.then_(cb, p);
 

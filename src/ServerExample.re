@@ -38,7 +38,7 @@ module HelloJson =
 module HelloQuery =
   App.Handle({
     let verb = GET;
-    let path = "hello/query";
+    let path = "/hello/query";
 
     [@decco.decode]
     type query = {name: string};

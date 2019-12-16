@@ -22,9 +22,11 @@ let application = (~port=?, endpoints: list(endpoint)) => {
     ->Belt.Option.map(a => Js.Float.fromString(a)->int_of_float)
     ->Belt.Option.getWithDefault(3000);
 
+  let effectivePort = port->Belt.Option.getWithDefault(defaultPort);
+
   app->Express.App.listen(
-    ~port=port->Belt.Option.getWithDefault(defaultPort),
-    ~onListen=_ => {Js.log2("Server listening on port", port)},
+    ~port=effectivePort,
+    ~onListen=_ => {Js.log2("Server listening on port", effectivePort)},
     (),
   )
   |> ignore;

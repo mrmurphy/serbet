@@ -1,3 +1,5 @@
+module Express = Express;
+
 module Endpoint = Serbet_Endpoint;
 type endpoint = Endpoint.endpoint;
 

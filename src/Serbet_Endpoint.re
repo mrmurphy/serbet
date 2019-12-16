@@ -246,7 +246,7 @@ let endpoint = (~middleware=?, cfg: endpointConfig): endpoint => {
       app->verbFunction(
         ~path=cfg.path,
         Belt.Array.concat(
-          middleware->Belt.Option.getWithDefault([||]),
+          middleware->Belt.Option.getWithDefault(defaultMiddleware),
           [|expressHandler|],
         ),
       );
@@ -256,7 +256,7 @@ let endpoint = (~middleware=?, cfg: endpointConfig): endpoint => {
       router->verbFunctionForRouter(
         ~path=cfg.path,
         Belt.Array.concat(
-          middleware->Belt.Option.getWithDefault([||]),
+          middleware->Belt.Option.getWithDefault(defaultMiddleware),
           [|expressHandler|],
         ),
       );

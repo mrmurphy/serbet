@@ -1,25 +1,33 @@
-module App = (()) => {
+module Endpoint = Serbet_Endpoint;
+type endpoint = Endpoint.endpoint;
+
+let endpoint = Endpoint.endpoint;
+let jsonEndpoint = Endpoint.jsonEndpoint;
+
+type application = {
+  expressApp: Express.App.t,
+  router: Express.Router.t,
+};
+
+let application = (~port=?, endpoints: list(endpoint)) => {
   let app = Express.App.make();
   let router = Express.Router.make();
   app->Express.App.useRouter(router);
 
-  include Serbet_Handler;
+  endpoints->Belt.List.forEach(ep => {ep.useOnRouter(router)});
 
-  module Handle =
-    Serbet_Handler.Make({
-      let app = app;
-    });
+  let defaultPort =
+    Node.Process.process##env
+    ->Js.Dict.get("PORT")
+    ->Belt.Option.map(a => Js.Float.fromString(a)->int_of_float)
+    ->Belt.Option.getWithDefault(3000);
 
-  module HandleJson =
-    Serbet_Handler.MakeJson({
-      let app = app;
-    });
+  app->Express.App.listen(
+    ~port=port->Belt.Option.getWithDefault(defaultPort),
+    ~onListen=_ => {Js.log2("Server listening on port", port)},
+    (),
+  )
+  |> ignore;
 
-  let start = (~port=?, ()) => {
-    app->Express.App.listen(
-      ~port=port->Belt.Option.getWithDefault(3000),
-      ~onListen=_ => {Js.log2("Server listening on port", port)},
-      (),
-    );
-  };
+  {expressApp: app, router};
 };

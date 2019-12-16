@@ -1,11 +1,10 @@
 open Async;
-type complete = Express.complete;
 
 module Status = {
   include Express.Response.StatusCode;
 };
 
-type res =
+type response =
   | BadRequest(string)
   | NotFound(string)
   | Unauthorized(string)
@@ -19,7 +18,7 @@ type res =
   | RespondRaw(Express.Response.t => Express.complete)
   | RespondRawAsync(Express.Response.t => promise(Express.complete));
 
-exception HttpException(res);
+exception HttpException(response);
 
 let abort = res => {
   raise(HttpException(res));
@@ -117,79 +116,85 @@ let requireQuery: Decco.decoder('query) => guard('query) =
     | Ok(v) => async @@ v
     };
   };
-type handler = Express.Request.t => promise(res);
 
-module type HandlerConfigWithCustomMiddleware = {
-  let path: string;
-  let verb: verb;
-  let middleware: option(array(Express.Middleware.t));
-  let handler: handler;
+[@bs.module]
+external jsonParsingMiddleware: Express.Middleware.t =
+  "./json-parsing-middleware.js";
+
+type endpointConfig = {
+  path: string,
+  verb,
+  handler: Express.Request.t => Js.Promise.t(response),
 };
 
-module type AppCfg = {let app: Express.App.t;};
+type jsonEndpointConfig('requestBody, 'responseBody) = {
+  path: string,
+  verb,
+  body_in_decode: Decco.decoder('requestBody),
+  body_out_encode: Decco.encoder('responseBody),
+  handler: ('requestBody, Express.Request.t) => Js.Promise.t('responseBody),
+};
 
-module MakeWithCustomMiddleware =
-       (AppCfg: AppCfg, Cfg: HandlerConfigWithCustomMiddleware) => {
-  let verbFunction =
-    switch (Cfg.verb) {
-    | GET => Express.App.getWithMany
-    | POST => Express.App.postWithMany
-    | PUT => Express.App.putWithMany
-    | DELETE => Express.App.deleteWithMany
-    };
+type endpoint = {
+  use: Express.App.t => unit,
+  useOnRouter: Express.Router.t => unit,
+};
 
-  let resToExpressRes = (res, handlerRes) =>
-    switch (handlerRes) {
-    | BadRequest(msg) =>
-      async @@
-      Express.Response.(res |> status(Status.BadRequest) |> sendString(msg))
-    | NotFound(msg) =>
-      async @@
-      Express.Response.(res |> status(Status.NotFound) |> sendString(msg))
-    | Unauthorized(msg) =>
-      async @@
-      Express.Response.(
-        res |> status(Status.Unauthorized) |> sendString(msg)
-      )
-    | OkString(msg) =>
-      async @@
-      Express.Response.(
-        res
-        |> status(Status.Ok)
-        |> setHeader("content-type", "text/plain; charset=utf-8")
-        |> sendString(msg)
-      )
-    | OkJson(js) =>
-      async @@ Express.Response.(res |> status(Status.Ok) |> sendJson(js))
-    | OkBuffer(buff) =>
-      async @@
-      Express.Response.(res |> status(Status.Ok) |> sendBuffer(buff))
-    | StatusString(stat, msg) =>
-      async @@
-      Express.Response.(
-        res
-        |> status(stat)
-        |> setHeader("content-type", "text/plain; charset=utf-8")
-        |> sendString(msg)
-      )
-    | InternalServerError =>
-      async @@
-      Express.Response.(
-        res |> sendStatus(Express.Response.StatusCode.InternalServerError)
-      )
-    | StatusJson(stat, js) =>
-      async @@ Express.Response.(res |> status(stat) |> sendJson(js))
-    | TemporaryRedirect(location) =>
-      async @@
-      Express.Response.(
-        res
-        |> setHeader("Location", location)
-        |> sendStatus(StatusCode.TemporaryRedirect)
-      )
-    | RespondRaw(fn) => async @@ fn(res)
-    | RespondRawAsync(fn) => fn(res)
-    };
+let _resToExpressRes = (res, handlerRes) =>
+  switch (handlerRes) {
+  | BadRequest(msg) =>
+    async @@
+    Express.Response.(res |> status(Status.BadRequest) |> sendString(msg))
+  | NotFound(msg) =>
+    async @@
+    Express.Response.(res |> status(Status.NotFound) |> sendString(msg))
+  | Unauthorized(msg) =>
+    async @@
+    Express.Response.(res |> status(Status.Unauthorized) |> sendString(msg))
+  | OkString(msg) =>
+    async @@
+    Express.Response.(
+      res
+      |> status(Status.Ok)
+      |> setHeader("content-type", "text/plain; charset=utf-8")
+      |> sendString(msg)
+    )
+  | OkJson(js) =>
+    async @@ Express.Response.(res |> status(Status.Ok) |> sendJson(js))
+  | OkBuffer(buff) =>
+    async @@ Express.Response.(res |> status(Status.Ok) |> sendBuffer(buff))
+  | StatusString(stat, msg) =>
+    async @@
+    Express.Response.(
+      res
+      |> status(stat)
+      |> setHeader("content-type", "text/plain; charset=utf-8")
+      |> sendString(msg)
+    )
+  | InternalServerError =>
+    async @@
+    Express.Response.(
+      res |> sendStatus(Express.Response.StatusCode.InternalServerError)
+    )
+  | StatusJson(stat, js) =>
+    async @@ Express.Response.(res |> status(stat) |> sendJson(js))
+  | TemporaryRedirect(location) =>
+    async @@
+    Express.Response.(
+      res
+      |> setHeader("Location", location)
+      |> sendStatus(StatusCode.TemporaryRedirect)
+    )
+  | RespondRaw(fn) => async @@ fn(res)
+  | RespondRawAsync(fn) => fn(res)
+  };
 
+let defaultMiddleware = [|
+  // By default we parse JSON bodies
+  jsonParsingMiddleware,
+|];
+
+let endpoint = (~middleware=?, cfg: endpointConfig): endpoint => {
   let wrappedHandler = (_next, req, res) => {
     let handleOCamlError =
       [@bs.open]
@@ -209,76 +214,69 @@ module MakeWithCustomMiddleware =
       };
     };
 
-    switch (Cfg.handler(req)) {
+    switch (cfg.handler(req)) {
     | exception err =>
       let%Async r = handleError(err);
-      resToExpressRes(res, r);
+      _resToExpressRes(res, r);
     | p =>
       let%Async r = p->catch(handleError);
-      resToExpressRes(res, r);
+      _resToExpressRes(res, r);
     };
   };
   let expressHandler = Express.PromiseMiddleware.from(wrappedHandler);
 
-  AppCfg.app->verbFunction(
-    ~path=Cfg.path,
-    Belt.Array.concat(
-      Cfg.middleware->Belt.Option.getWithDefault([||]),
-      [|expressHandler|],
-    ),
+  let verbFunction =
+    switch (cfg.verb) {
+    | GET => Express.App.getWithMany
+    | POST => Express.App.postWithMany
+    | PUT => Express.App.putWithMany
+    | DELETE => Express.App.deleteWithMany
+    };
+
+  let verbFunctionForRouter =
+    switch (cfg.verb) {
+    | GET => Express.Router.getWithMany
+    | POST => Express.Router.postWithMany
+    | PUT => Express.Router.putWithMany
+    | DELETE => Express.Router.deleteWithMany
+    };
+
+  {
+    use: app => {
+      app->verbFunction(
+        ~path=cfg.path,
+        Belt.Array.concat(
+          middleware->Belt.Option.getWithDefault([||]),
+          [|expressHandler|],
+        ),
+      );
+    },
+
+    useOnRouter: router => {
+      router->verbFunctionForRouter(
+        ~path=cfg.path,
+        Belt.Array.concat(
+          middleware->Belt.Option.getWithDefault([||]),
+          [|expressHandler|],
+        ),
+      );
+    },
+  };
+};
+
+let jsonEndpoint =
+    (~middleware=?, cfg: jsonEndpointConfig('requestBody, 'responseBody))
+    : endpoint => {
+  endpoint(
+    ~middleware?,
+    {
+      path: cfg.path,
+      verb: cfg.verb,
+      handler: req => {
+        let%Async body = requireBody(cfg.body_in_decode, req);
+        let%Async response = cfg.handler(body, req);
+        async(OkJson(cfg.body_out_encode(response)));
+      },
+    },
   );
-};
-
-module type HandlerConfig = {
-  let path: string;
-  let verb: verb;
-  let handler: handler;
-};
-
-[@bs.module]
-external jsonParsingMiddleware: Express.Middleware.t =
-  "./json-parsing-middleware.js";
-
-module Make = (AppCfg: AppCfg, Cfg: HandlerConfig) => {
-  include MakeWithCustomMiddleware(
-            AppCfg,
-            {
-              let path = Cfg.path;
-              let verb = Cfg.verb;
-              let handler = Cfg.handler;
-              let middleware =
-                Some([|
-                  // By default we parse JSON bodies
-                  jsonParsingMiddleware,
-                |]);
-            },
-          );
-};
-
-module type HandlerConfigWithBody = {
-  let path: string;
-  let verb: verb;
-
-  type body;
-  let body_decode: Decco.decoder(body);
-
-  type response;
-  let response_encode: Decco.encoder(response);
-
-  let handler: (body, Express.Request.t) => promise(response);
-};
-
-module MakeJson = (AppCfg: AppCfg, Cfg: HandlerConfigWithBody) => {
-  include Make(
-            AppCfg,
-            {
-              let path = Cfg.path;
-              let verb = Cfg.verb;
-              let handler = req => {
-                let%Async body = requireBody(Cfg.body_decode, req);
-                let%Async response = Cfg.handler(body, req);
-                async(OkJson(Cfg.response_encode(response)));
-              };
-            },
-          );
 };

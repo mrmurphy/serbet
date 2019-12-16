@@ -20,20 +20,18 @@ let newUser = () => {
   async @@ {id: 1, email: ""};
 };
 
-module App =
-  Serbet.App({});
+open Serbet.Endpoint;
 
-module Hello =
-  App.Handle({
-    open App;
-    let verb = GET;
-    let path = "/";
-    let handler = _req => {
+let hello =
+  Serbet.endpoint({
+    verb: GET,
+    path: "/",
+    handler: _req => {
       let%Async user = newUser();
       let%Async user2 = processUser(user);
       let%Async _ = saveUserInDatabase(user2);
       async @@ OkString("Done");
-    };
+    },
   });
 
-App.start(~port=3110, ());
+let app = Serbet.application([hello]);

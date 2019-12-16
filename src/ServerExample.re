@@ -1,53 +1,58 @@
 open Async;
+open Serbet.Endpoint;
 
-module App =
-  Serbet.App({});
-
-open App;
-
-// This makes and registers an endpoint, all in one go.
-module Hello =
-  App.Handle({
-    let verb = GET;
-    let path = "/";
-    let handler = _req => {
+let hello =
+  Serbet.endpoint({
+    verb: GET,
+    path: "/",
+    handler: _req => {
       // In case you've never seen it before, @@ evaluates the result of its right-hand side, and passes the result as the only argument to whatever function is on the left-hand side.
       async @@ OkString("Hello, world");
-    };
+    },
   });
 
-// This is a convenience module which automatically parses and json body and encodes a json response.
-module HelloJson =
-  App.HandleJson({
-    let verb = POST;
-    let path = "/json";
+module HelloJson = {
+  // We need to specify request and response body types and decoders for the handler function! Decco generates the codecs for us automatically.
+  [@decco.decode]
+  type body_in = {name: string};
 
-    // The HandleJson module config requires us to specify a body type (with its decoder, which is provided by the @decco decorator here.) and a response type.
-    [@decco.decode]
-    type body = {name: string};
+  [@decco.encode]
+  type body_out = {greeting: string};
 
-    [@decco.encode]
-    type response = {greeting: string};
+  let endpoint =
+    Serbet.jsonEndpoint({
+      verb: POST,
+      path: "/json",
+      body_in_decode,
+      body_out_encode,
 
-    // Now the parsed body gets passed in as the first argument to the handler.
-    let handler = (body, _req) => {
-      async @@ {greeting: "Hello " ++ body.name};
-    };
-  });
+      // Now the parsed body gets passed in as the first argument to the handler, and we can return the unencoded response body from the function, and the framework takes care of the rest.
+      handler: (body, _req) => {
+        async @@ {greeting: "Hello " ++ body.name};
+      },
+    });
+};
 
-module HelloQuery =
-  App.Handle({
-    let verb = GET;
-    let path = "/hello/query";
+module HelloQuery = {
+  [@decco.decode]
+  type query = {name: string};
 
-    [@decco.decode]
-    type query = {name: string};
+  let endpoint =
+    Serbet.endpoint({
+      verb: GET,
+      path: "/hello/query",
 
-    let handler = req => {
-      let%Async query = requireQuery(query_decode, req);
+      handler: req => {
+        let%Async query = requireQuery(query_decode, req);
+        OkString("Hello there, " ++ query.name)->async;
+      },
+    });
+};
 
-      OkString("Hello there, " ++ query.name)->async;
-    };
-  });
-
-App.start(~port=3110, ());
+// This makes an application, registers the endpoints, and starts the app.
+// If no port is specified, the PORT env var is used, or if that's not specified, some other default.
+let app =
+  Serbet.application(
+    ~port=3110,
+    [hello, HelloJson.endpoint, HelloQuery.endpoint],
+  );

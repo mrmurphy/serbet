@@ -43,8 +43,37 @@ module HelloQuery = {
       path: "/hello/query",
 
       handler: req => {
-        let%Async query = requireQuery(query_decode, req);
+        let%Async query = req.requireQuery(query_decode);
         OkString("Hello there, " ++ query.name)->async;
+      },
+    });
+};
+
+module AuthorizedHello = {
+  [@decco.decode]
+  type query = {name: string};
+
+  type user = {name: string};
+
+  // All we need to do for authentication and authorization is make a function
+  // that takes the request, and either returns a promise with the user, or aborts
+  // with some error message to the caller.
+  let authorize = req => {
+    let%Async authHeader = req.requireHeader("authorization");
+    switch (authHeader) {
+    | "Bearer: frodobaggins" => {name: "frodo"}->async
+    | _ => abort @@ Unauthorized("Only the ring bearer is allowed here")
+    };
+  };
+
+  let endpoint =
+    Serbet.endpoint({
+      verb: GET,
+      path: "/hello",
+
+      handler: req => {
+        let%Async user = authorize(req);
+        OkString("Hello there, " ++ user.name)->async;
       },
     });
 };

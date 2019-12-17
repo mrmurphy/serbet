@@ -4,6 +4,14 @@ module Status = {
   include Express.Response.StatusCode;
 };
 
+type request('body, 'query, 'params) = {
+  req: Express.Request.t,
+  requireBody: Decco.decoder('body) => Js.Promise.t('body),
+  requireQuery: Decco.decoder('query) => Js.Promise.t('query),
+  requireParams: Decco.decoder('params) => Js.Promise.t('params),
+  requireHeader: string => Js.Promise.t(string),
+};
+
 type response =
   | BadRequest(string)
   | NotFound(string)
@@ -121,18 +129,19 @@ let requireQuery: Decco.decoder('query) => guard('query) =
 external jsonParsingMiddleware: Express.Middleware.t =
   "./json-parsing-middleware.js";
 
-type endpointConfig = {
+type endpointConfig('body_in, 'params, 'query) = {
   path: string,
   verb,
-  handler: Express.Request.t => Js.Promise.t(response),
+  handler: request('body_in, 'params, 'query) => Js.Promise.t(response),
 };
 
-type jsonEndpointConfig('requestBody, 'responseBody) = {
+type jsonEndpointConfig('body_in, 'params, 'query, 'body_out) = {
   path: string,
   verb,
-  body_in_decode: Decco.decoder('requestBody),
-  body_out_encode: Decco.encoder('responseBody),
-  handler: ('requestBody, Express.Request.t) => Js.Promise.t('responseBody),
+  body_in_decode: Decco.decoder('body_in),
+  body_out_encode: Decco.encoder('body_out),
+  handler:
+    ('body_in, request('body_in, 'params, 'query)) => Js.Promise.t('body_out),
 };
 
 type endpoint = {
@@ -194,7 +203,8 @@ let defaultMiddleware = [|
   jsonParsingMiddleware,
 |];
 
-let endpoint = (~middleware=?, cfg: endpointConfig): endpoint => {
+let endpoint =
+    (~middleware=?, cfg: endpointConfig('body, 'params, 'query)): endpoint => {
   let wrappedHandler = (_next, req, res) => {
     let handleOCamlError =
       [@bs.open]
@@ -214,7 +224,15 @@ let endpoint = (~middleware=?, cfg: endpointConfig): endpoint => {
       };
     };
 
-    switch (cfg.handler(req)) {
+    let request = {
+      req,
+      requireBody: a => requireBody(a, req),
+      requireQuery: a => requireQuery(a, req),
+      requireParams: a => requireParams(a, req),
+      requireHeader: a => requireHeader(a, req),
+    };
+
+    switch (cfg.handler(request)) {
     | exception err =>
       let%Async r = handleError(err);
       _resToExpressRes(res, r);
@@ -265,7 +283,10 @@ let endpoint = (~middleware=?, cfg: endpointConfig): endpoint => {
 };
 
 let jsonEndpoint =
-    (~middleware=?, cfg: jsonEndpointConfig('requestBody, 'responseBody))
+    (
+      ~middleware=?,
+      cfg: jsonEndpointConfig('body_in, 'query, 'params, 'body_out),
+    )
     : endpoint => {
   endpoint(
     ~middleware?,
@@ -273,7 +294,7 @@ let jsonEndpoint =
       path: cfg.path,
       verb: cfg.verb,
       handler: req => {
-        let%Async body = requireBody(cfg.body_in_decode, req);
+        let%Async body = req.requireBody(cfg.body_in_decode);
         let%Async response = cfg.handler(body, req);
         async(OkJson(cfg.body_out_encode(response)));
       },

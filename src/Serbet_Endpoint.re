@@ -237,7 +237,7 @@ let endpoint =
       let%Async r = handleError(err);
       _resToExpressRes(res, r);
     | p =>
-      let%Async r = p->catch(handleError);
+      let%Async r = p->catchAsync(handleError);
       _resToExpressRes(res, r);
     };
   };

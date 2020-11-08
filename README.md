@@ -1,4 +1,6 @@
-## Serbet (like sorbet, but a server. Get it? 🍨)
+![Logo Artwork](https://user-images.githubusercontent.com/1227109/98459287-9a470780-213d-11eb-8cb3-20ba97c5cac9.png)
+
+## Serbet (like sorbet, but a server. Get it?)
 
 A simple way to set up an Express.js server on top of Node.js using ReasonML.
 
@@ -13,3 +15,5 @@ Here are some quick tips:
 - You can abort the request at any time with the `abort` function, which takes a `response` type. (This uses JS promise exceptions)
 
 Those are the very sparse docs for now. It looks like a side project, but we've been using the these patterns in production already and are quite happy with the results.
+
+Thanks so much to [Laura Randle](https://www.laurajrandle.com) for the artwork.

@@ -16,14 +16,14 @@
   "author": "Murphy Randle",
   "license": "MIT",
   "peerDependencies": {
-    "bs-platform": "^6.x.x",
-    "decco": "^1.0.0",
-    "bs-let": "^0.1.11"
+    "bs-platform": "^9.0.2",
+    "decco": "^1.5.0",
+    "bs-let": "^0.1.16"
   },
   "dependencies": {
     "bluebird": "^3.7.2",
     "body-parser": "^1.19.0",
-    "bs-express": "^1.0.0"
+    "bs-express": "^1.0.2"
   },
   "devDependencies": {}
 }
